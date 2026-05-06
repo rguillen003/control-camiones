@@ -1,0 +1,24 @@
+{
+  "name": "Control de Camiones - Lonccos y Ccalas",
+  "short_name": "Control Camiones",
+  "description": "Sistema de control de llegadas de camiones",
+  "start_url": "/control-camiones/",
+  "display": "standalone",
+  "background_color": "#f5f5f3",
+  "theme_color": "#1D9E75",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
