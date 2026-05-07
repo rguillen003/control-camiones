@@ -162,10 +162,10 @@ tr:hover td{background:#faf9f7;}
     <div class="st">Datos del camión</div>
     <div class="fg">
       <div><label>Fecha</label><input type="date" id="f-fecha"></div>
-      <div><label>Conductor</label><input type="text" id="f-conductor" placeholder="Nombre completo"></div>
-      <div><label>Tracto</label><input type="text" id="f-tracto" placeholder="Placa / código"></div>
-      <div><label>Carreta</label><input type="text" id="f-carreta" placeholder="Placa / código"></div>
-      <div><label>Planta</label><input type="text" id="f-planta" placeholder="Nombre de la planta"></div>
+      <div><label>Conductor</label><input type="text" id="f-conductor" placeholder="Nombre completo" oninput="this.value=this.value.toUpperCase()"></div>
+      <div><label>Tracto</label><input type="text" id="f-tracto" placeholder="Placa / código" oninput="this.value=this.value.toUpperCase()"></div>
+      <div><label>Carreta</label><input type="text" id="f-carreta" placeholder="Placa / código" oninput="this.value=this.value.toUpperCase()"></div>
+      <div><label>Planta</label><input type="text" id="f-planta" placeholder="Nombre de la planta" oninput="this.value=this.value.toUpperCase()"></div>
     </div>
     <div class="st">Observaciones</div>
     <textarea id="f-obs" placeholder="Notas adicionales (opcional)"></textarea>
