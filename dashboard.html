@@ -277,25 +277,84 @@ function renderAll(){
 
   const dataF=filtroPlanta?data.filter(r=>(r.planta||'Sin planta')===filtroPlanta):data;
 
-  // GRÁFICO INGRESO
+  // GRÁFICO TIEMPO DE ATENCIÓN + LÍNEA ESTÁNDAR
   kC('ch-ingreso');
   if(dataF.length){
-    const horasReg=dataF.map(r=>timeToMin(r.hRegistro));
     const tiemposAt=dataF.map(r=>mdiff(r.hRegistro,r.hSalida));
-    const minBase=horasReg.filter(x=>x!==null).reduce((a,b)=>Math.min(a,b),1440)-5;
-    const vhStart=timeToMin(CFG.vI||'06:00'),vhEnd=timeToMin(CFG.vF||'15:00');
-    const colores=dataF.map(r=>r.fueraVentana?'rgba(226,75,74,0.85)':PC[(plantaIdx[r.planta||'Sin planta']||0)%8]+'cc');
+    const uTot=+(CFG.uTot||120); // estándar configurable desde la app
+    const colores=dataF.map(r=>{
+      const t=mdiff(r.hRegistro,r.hSalida);
+      if(t===null) return 'rgba(100,100,100,0.4)';
+      if(r.fueraVentana) return 'rgba(226,75,74,0.85)';
+      return t<=uTot?PC[(plantaIdx[r.planta||'Sin planta']||0)%8]+'cc':'rgba(226,75,74,0.85)';
+    });
+    const estandarLine=dataF.map(()=>uTot); // línea horizontal del estándar
     const ctx=document.getElementById('ch-ingreso');
-    charts['ch-ingreso']=new Chart(ctx,{type:'bar',data:{labels:dataF.map((_,i)=>'U'+(data.indexOf(dataF[i])+1)),datasets:[
-      {label:'Hora ingreso',data:horasReg.map(h=>h!==null?h-minBase:0),backgroundColor:colores,borderWidth:0,yAxisID:'y'},
-      {label:'T. atención',data:tiemposAt,type:'line',borderColor:'#FAC775',backgroundColor:'transparent',pointRadius:5,pointBackgroundColor:'#FAC775',borderWidth:2,yAxisID:'y2',spanGaps:true}
-    ]},options:{responsive:true,maintainAspectRatio:false,
-      onClick:(e,els)=>{if(els.length&&els[0].datasetIndex===0)abrirDetalle(dataF[els[0].index]);},
-      plugins:{legend:{display:false},
-        tooltip:{callbacks:{label:(ctx)=>{if(ctx.datasetIndex===0){const r=dataF[ctx.dataIndex];return[' Ingreso: '+(r.hRegistro||'—'),r.fueraVentana?' ⚠ Fuera de ventana':' ✓ Dentro de ventana',' Planta: '+(r.planta||'—'),' Conductor: '+(r.conductor||'—')];}return' T.atención: '+fmt(ctx.raw);}}}},
-      scales:{x:{ticks:{font:{size:10},color:'#888'},grid:{color:'rgba(255,255,255,0.04)'}},y:{display:false,beginAtZero:true},y2:{position:'right',ticks:{font:{size:10},color:'#FAC775'},grid:{display:false},beginAtZero:true}}
-    }});
-    ctx.ondblclick=(e)=>{const pts=charts['ch-ingreso'].getElementsAtEventForMode(e,'nearest',{intersect:true},true);if(pts.length&&pts[0].datasetIndex===0)abrirDetalle(dataF[pts[0].index]);};
+    charts['ch-ingreso']=new Chart(ctx,{type:'bar',
+      data:{
+        labels:dataF.map((_,i)=>'U'+(data.indexOf(dataF[i])+1)),
+        datasets:[
+          {
+            label:'Tiempo de atención',
+            data:tiemposAt,
+            backgroundColor:colores,
+            borderWidth:0,
+            borderRadius:4,
+            yAxisID:'y'
+          },
+          {
+            label:'Estándar ('+fmt(uTot)+')',
+            data:estandarLine,
+            type:'line',
+            borderColor:'rgba(201,162,39,0.9)',
+            backgroundColor:'transparent',
+            borderWidth:2,
+            borderDash:[6,4],
+            pointRadius:0,
+            tension:0,
+            yAxisID:'y'
+          }
+        ]
+      },
+      options:{
+        responsive:true,
+        maintainAspectRatio:false,
+        onClick:(e,els)=>{if(els.length&&els[0].datasetIndex===0)abrirDetalle(dataF[els[0].index]);},
+        plugins:{
+          legend:{display:false},
+          tooltip:{
+            callbacks:{
+              label:(ctx)=>{
+                const r=dataF[ctx.dataIndex];
+                if(ctx.datasetIndex===1) return ' Estándar: '+fmt(uTot);
+                const t=ctx.raw;
+                const diff=t!==null?t-uTot:null;
+                return[
+                  ' T. atención: '+fmt(t),
+                  diff!==null?(diff>0?' ▲ '+fmt(diff)+' sobre estándar':' ▼ '+fmt(Math.abs(diff))+' bajo estándar'):'',
+                  ' Conductor: '+(r.conductor||'—'),
+                  ' Planta: '+(r.planta||'—'),
+                  ' Ingreso: '+(r.hRegistro||'—'),
+                  r.fueraVentana?' ⚠ Fuera de ventana':' ✓ Dentro de ventana'
+                ].filter(x=>x);
+              }
+            }
+          }
+        },
+        scales:{
+          x:{ticks:{font:{size:10},color:'#888'},grid:{color:'rgba(255,255,255,0.04)'}},
+          y:{
+            ticks:{font:{size:10},color:'#888',callback:(v)=>fmtHHMM(v)},
+            beginAtZero:true,
+            grid:{color:'rgba(255,255,255,0.06)'}
+          }
+        }
+      }
+    });
+    ctx.ondblclick=(e)=>{
+      const pts=charts['ch-ingreso'].getElementsAtEventForMode(e,'nearest',{intersect:true},true);
+      if(pts.length&&pts[0].datasetIndex===0) abrirDetalle(dataF[pts[0].index]);
+    };
   }
 
   // GRÁFICO TIEMPO MUERTO
