@@ -162,10 +162,10 @@ tr:hover td{background:#faf9f7;}
     <div class="st">Datos del camión</div>
     <div class="fg">
       <div><label>Fecha</label><input type="date" id="f-fecha"></div>
-      <div><label>Conductor</label><input type="text" id="f-conductor" placeholder="Nombre completo" oninput="this.value=this.value.toUpperCase()"></div>
-      <div><label>Tracto</label><input type="text" id="f-tracto" placeholder="Placa / código" oninput="this.value=this.value.toUpperCase()"></div>
-      <div><label>Carreta</label><input type="text" id="f-carreta" placeholder="Placa / código" oninput="this.value=this.value.toUpperCase()"></div>
-      <div><label>Planta</label><input type="text" id="f-planta" placeholder="Nombre de la planta" oninput="this.value=this.value.toUpperCase()"></div>
+      <div><label>Conductor</label><input type="text" id="f-conductor" placeholder="Nombre completo" oninput="this.value=quitarTildes(this.value)"></div>
+      <div><label>Tracto</label><input type="text" id="f-tracto" placeholder="Placa / código" oninput="this.value=quitarTildes(this.value)"></div>
+      <div><label>Carreta</label><input type="text" id="f-carreta" placeholder="Placa / código" oninput="this.value=quitarTildes(this.value)"></div>
+      <div><label>Planta</label><input type="text" id="f-planta" placeholder="Nombre de la planta" oninput="this.value=quitarTildes(this.value)"></div>
     </div>
     <div class="st">Observaciones</div>
     <textarea id="f-obs" placeholder="Notas adicionales (opcional)"></textarea>
@@ -181,6 +181,8 @@ tr:hover td{background:#faf9f7;}
     <input type="text" id="s-q" placeholder="Buscar conductor, tracto, planta…" oninput="renderSeg()" style="min-width:200px;">
     <select id="s-est" onchange="renderSeg()"><option value="">Todos los estados</option><option>En espera</option><option>En operación</option><option>Finalizado</option></select>
     <input type="date" id="s-fecha" onchange="renderSeg()">
+    <button class="btn sm ghost" onclick="toggleSort()" id="sort-btn" title="Ordenar por fecha">📅 Fecha ↓</button>
+    <button class="btn sm ghost" onclick="toggleSort()" id="sort-btn">📅 Fecha ↓</button>
     <button class="btn sm ghost" onclick="cargarDB()">↻ Actualizar</button>
     <span id="s-count"></span>
   </div>
@@ -270,6 +272,8 @@ tr:hover td{background:#faf9f7;}
     <input type="number" id="prog-cant" placeholder="Cantidad programada" min="1" style="width:auto;min-width:180px;">
     <button class="btn primary sm" onclick="agregarProg()">Agregar día</button>
   </div>
+  <div id="prog-no-atendidas" style="margin-top:12px;"></div>
+  <div id="prog-no-atendidas" style="margin-top:14px;"></div>
   <div class="sep"></div>
   <div style="font-size:15px;font-weight:600;margin-bottom:10px;">Ventana horaria de recepción</div>
   <div class="fg" style="max-width:360px;">
@@ -376,9 +380,44 @@ function gCfgProg(){return _progLocal||{};}
 function gCfg(){return{uEsp:+document.getElementById('u-esp').value||30,uDesc:+document.getElementById('u-desc').value||60,uCierr:+document.getElementById('u-cierr').value||30,uTot:+document.getElementById('u-tot').value||120,uVent:+document.getElementById('u-vent').value||80,vI:document.getElementById('u-vi').value||'06:00',vF:document.getElementById('u-vf').value||'15:00',programacion:_progLocal||{}};}
 function agregarProg(){const f=document.getElementById('prog-fecha').value,c=parseInt(document.getElementById('prog-cant').value);if(!f){alert('Selecciona una fecha.');return;}if(!c||c<1){alert('Ingresa una cantidad válida.');return;}_progLocal[f]=c;saveCfg();renderProgTabla();}
 function eliminarProg(f){delete _progLocal[f];saveCfg();renderProgTabla();}
-function renderProgTabla(){const div=document.getElementById('prog-tabla');const keys=Object.keys(_progLocal).sort().reverse();if(!keys.length){div.innerHTML='<div style="font-size:13px;color:var(--txt2);grid-column:1/-1;">Sin días programados aún.</div>';return;}div.innerHTML=keys.map(f=>{const prog=_progLocal[f];const atendidos=gDB().filter(r=>r.fecha===f).length;const pct=Math.round(atendidos/prog*100);const col=pct>=100?'#1D9E75':pct>=75?'#BA7517':'#E24B4A';return`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px;"><div><div style="font-size:13px;font-weight:500;">${f}</div><div style="font-size:12px;color:var(--txt2);margin-top:2px;">${atendidos} / ${prog} camiones</div><div style="font-size:14px;font-weight:600;color:${col};margin-top:3px;">${pct}% cumplido</div></div><button class="btn sm danger" onclick="eliminarProg('${f}')">✕</button></div>`;}).join('');}
+function renderProgTabla(){
+  // Unidades no atendidas
+  const noAt=document.getElementById('prog-no-atendidas');
+  if(noAt){
+    const keys2=Object.keys(_progLocal).sort().reverse();
+    const filas=keys2.map(f=>{
+      const prog=_progLocal[f];
+      const atendidos=gDB().filter(r=>r.fecha===f).length;
+      const noAtendidas=Math.max(0,prog-atendidos);
+      const pct=Math.min(100,Math.round(atendidos/prog*100));
+      const col=pct>=100?'#1D9E75':pct>=75?'#BA7517':'#E24B4A';
+      return`<div style="display:grid;grid-template-columns:90px 1fr 90px 90px 80px;gap:8px;align-items:center;padding:7px 0;border-bottom:0.5px solid var(--border);font-size:13px;">
+        <span style="font-weight:500;">${fmtFecha(f)}</span>
+        <div style="background:var(--bg2);border-radius:4px;height:6px;overflow:hidden;"><div style="height:6px;width:${pct}%;background:${col};border-radius:4px;"></div></div>
+        <span style="color:var(--txt2);">${atendidos}/${prog} atend.</span>
+        <span style="font-weight:600;color:${col};">${pct}%</span>
+        <span style="font-weight:600;color:${noAtendidas>0?'#E24B4A':'#1D9E75'};">${noAtendidas>0?noAtendidas+' pendiente'+(noAtendidas>1?'s':''):'✓ Completo'}</span>
+      </div>`;
+    }).join('');
+    if(keys2.length){
+      const totalProg=keys2.reduce((a,f)=>a+(_progLocal[f]||0),0);
+      const totalAtend=keys2.reduce((a,f)=>a+gDB().filter(r=>r.fecha===f).length,0);
+      const totalNoAt=Math.max(0,totalProg-totalAtend);
+      noAt.innerHTML=`<div style="font-size:13px;font-weight:600;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+        <span>Unidades no atendidas por día</span>
+        <span style="font-size:12px;color:${totalNoAt>0?'#E24B4A':'#1D9E75'};font-weight:700;">${totalNoAt>0?'Total pendientes: '+totalNoAt:'✓ Todo completado'}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:90px 1fr 90px 90px 80px;gap:8px;font-size:10px;color:var(--txt2);font-weight:600;text-transform:uppercase;letter-spacing:.04em;padding-bottom:5px;border-bottom:1px solid var(--border);">
+        <span>Fecha</span><span>Avance</span><span>Atendidos</span><span>Cumpl.</span><span>Pendientes</span>
+      </div>${filas}`;
+    } else { noAt.innerHTML=''; }
+  }
+  const div=document.getElementById('prog-tabla');const keys=Object.keys(_progLocal).sort().reverse();if(!keys.length){div.innerHTML='<div style="font-size:13px;color:var(--txt2);grid-column:1/-1;">Sin días programados aún.</div>';return;}div.innerHTML=keys.map(f=>{const prog=_progLocal[f];const atendidos=gDB().filter(r=>r.fecha===f).length;const pct=Math.round(atendidos/prog*100);const col=pct>=100?'#1D9E75':pct>=75?'#BA7517':'#E24B4A';return`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px;"><div><div style="font-size:13px;font-weight:500;">${f}</div><div style="font-size:12px;color:var(--txt2);margin-top:2px;">${atendidos} / ${prog} camiones</div><div style="font-size:14px;font-weight:600;color:${col};margin-top:3px;">${pct}% cumplido</div></div><button class="btn sm danger" onclick="eliminarProg('${f}')">✕</button></div>`;}).join('');}
 
 function gDB(){return DB_LOCAL;}
+function quitarTildes(s){
+  return s.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+}
 function today(){return new Date().toISOString().slice(0,10);}
 function fmtFecha(f){if(!f)return'—';const[y,m,d]=f.split('-');return d+'/'+m+'/'+y;}
 function nowT(){const d=new Date();return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');}
@@ -444,6 +483,10 @@ function guardarEdicion(){
   });
 }
 function updateHdr(){const db=gDB(),t=today(),hoy=db.filter(r=>r.fecha===t);const prog=gCfgProg(),progHoy=prog[t];const progStr=progHoy?` · <span style="color:${hoy.length>=progHoy?'var(--g)':'var(--am)'};">${hoy.length}/${progHoy} programados (${Math.round(hoy.length/progHoy*100)}%)</span>`:'';document.getElementById('hdr-stats').innerHTML=`<span style="color:var(--bl);">&#9679; ${hoy.filter(r=>r.estado==='En operación').length} en operación</span><span>·</span><span>${hoy.filter(r=>r.estado==='En espera').length} en espera</span><span>·</span><span>${hoy.length} hoy</span>${progStr}`;}
+let sortDesc=true;
+function toggleSort(){sortDesc=!sortDesc;document.getElementById('sort-btn').textContent='📅 Fecha '+(sortDesc?'↓':'↑');renderSeg();}
+let sortDesc=true;
+function toggleSort(){sortDesc=!sortDesc;const b=document.getElementById('sort-btn');if(b)b.textContent='📅 Fecha '+(sortDesc?'↓':'↑');renderSeg();}
 function renderSeg(){const db=gDB(),q=(document.getElementById('s-q').value||'').toLowerCase(),est=document.getElementById('s-est').value,fecha=document.getElementById('s-fecha').value;const rows=db.filter(r=>(!q||(r.conductor||'').toLowerCase().includes(q)||(r.tracto||'').toLowerCase().includes(q)||(r.planta||'').toLowerCase().includes(q))&&(!est||r.estado===est)&&(!fecha||r.fecha===fecha));document.getElementById('s-count').textContent=rows.length+' registro(s)';const tbody=document.getElementById('seg-body');if(!rows.length){tbody.innerHTML='';document.getElementById('seg-empty').style.display='block';return;}document.getElementById('seg-empty').style.display='none';
 tbody.innerHTML=rows.map(r=>{const tE=mdiff(r.hRegistro,r.hApertura),tD=mdiff(r.hApertura,r.hCierre),tC=mdiff(r.hCierre,r.hSalida),tT=mdiff(r.hRegistro,r.hSalida);const hasAp=!!r.hApertura,hasCi=!!r.hCierre,hasSal=!!r.hSalida;
 const flujo=`<div class="flow-row"><div class="time-chip"><div class="tc-dot" style="background:var(--bl);"></div>${r.hRegistro||'—'}</div><div class="flow-arrow">→</div><div class="time-chip"><div class="tc-dot" style="background:${hasAp?'var(--am)':'#ccc'};"></div>${r.hApertura||'--:--'}</div><div class="flow-arrow">→</div><div class="time-chip"><div class="tc-dot" style="background:${hasCi?'#7F77DD':'#ccc'};"></div>${r.hCierre||'--:--'}</div><div class="flow-arrow">→</div><div class="time-chip"><div class="tc-dot" style="background:${hasSal?'var(--g)':'#ccc'};"></div>${r.hSalida||'--:--'}</div></div>`;
